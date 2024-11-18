@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="event">
+
+	<sql id="search">
+		SELECT * FROM event
+
+		<where>
+		
+			<if test="keyword != null and keyword != ''">
+	            <if test="search == 0">
+	                title LIKE CONCAT(CONCAT('%', #{keyword}), '%')
+	            </if>
+	
+	            <if test="search == 1">
+	                category = '1' AND title LIKE CONCAT(CONCAT('%', #{keyword}), '%')
+	            </if>
+	
+	            <if test="search == 2">
+	                category = '2' AND title LIKE CONCAT(CONCAT('%', #{keyword}), '%')
+	            </if>
+        	</if>
+        	
+		</where>
+
+		ORDER BY id
+	</sql>
+
+
+	<select id="total" resultType="Integer">
+		SELECT COUNT(*) FROM (<include refid="search"></include>)
+	</select>
+
+	<select id="list" resultType="Event">
+		SELECT * FROM
+			(SELECT sub.*, ROWNUM rnum FROM
+				(<include refid="search"></include>) sub)
+
+		<if test="perPage != 0">
+			WHERE rnum BETWEEN ((#{page} - 1) * #{perPage}) + 1 AND (#{page} * #{perPage})
+		</if>
+	</select>
+	
+	<insert id="add">
+		INSERT INTO event
+		(id, category, title, place, open_date, close_date)
+		VALUES 
+		(EVENT_SEQ.nextval, #{category}, #{title}, #{place}, #{openDate}, #{closeDate})
+		
+		<selectKey keyProperty="id" resultType="Long" order="AFTER">
+			SELECT EVENT_SEQ.currval FROM dual
+		</selectKey>
+	</insert>
+	
+	<insert id="add_photo">
+		INSERT INTO photo(id, event_id, file_name, uuid)
+		VALUES (PHOTO_SEQ.nextval, #{eventId}, #{filename}, #{uuid})
+	</insert>
+	
+	<insert id="add_price">
+		INSERT INTO price(id, event_id, adult, teenager, children, disabled, patriot)
+		VALUES (PHOTO_SEQ.nextval, #{eventId}, #{adult}, #{teenager}, #{children}, #{disabled}, #{patriot})
+	</insert>
+	
+	<resultMap type="Event" id="eventMap" autoMapping="true">
+	    <!-- ID 매핑 -->
+	    <id column="id" property="id" />
+	
+	    <!-- 가격 정보 매핑 (association) -->
+	    <association property="price" javaType="Price">
+	        <id column="price_id" property="id" />
+	        <result column="adult" property="adult" />
+	        <result column="teenager" property="teenager" />
+	        <result column="children" property="children" />
+	        <result column="disabled" property="disabled" />
+	        <result column="patriot" property="patriot" />
+	        <result column="price_event_id" property="eventId" />
+	    </association>
+	
+	    <!-- 사진 정보 매핑 (collection) -->
+	    <collection property="photo" ofType="Photo" javaType="ArrayList">
+	        <id column="photo_id" property="id" />
+	        <result column="file_name" property="filename" />
+	        <result column="uuid" property="uuid" />
+	        <result column="photo_event_id" property="eventId" />
+	    </collection>
+	</resultMap>
+	
+	<select id="item" resultMap="eventMap">
+		SELECT event.*, 
+				photo.id photo_id, 
+				photo.file_name, 
+				photo.uuid, 
+				photo.event_id as photo_evetn_id,
+				price.id price_id,
+				price.adult,
+				price.teenager,
+				price.children,
+				price.disabled,
+				price.patriot,
+				price.event_id as price_event_id
+		FROM event
+		LEFT JOIN photo ON event.id=photo.event_id
+		LEFT JOIN price ON event.id=price.event_id
+		WHERE event.id=#{id}
+	</select>
+	
+	<update id="update">
+		UPDATE event
+		SET category=#{category}, title=#{title}, place=#{place}, open_date=#{openDate}, close_date=#{closeDate}
+		WHERE id=#{id}
+	</update>
+	
+	<update id="update_price">
+		UPDATE price
+    	SET adult=#{adult}, teenager=#{teenager}, children=#{children}, disabled=#{disabled}, patriot=#{patriot}
+    	WHERE event_id=#{eventId}
+	</update>
+	
+	<select id="item_photo" resultType="Photo">
+		SELECT * FROM photo
+		WHERE id=#{id}
+	</select>
+	
+	<delete id="delete_photo">
+		DELETE FROM photo
+		WHERE id=#{id}
+	</delete>
+
+</mapper>
